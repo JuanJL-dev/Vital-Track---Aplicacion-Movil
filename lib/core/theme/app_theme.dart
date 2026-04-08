@@ -16,6 +16,7 @@ class AppTheme {
   static const Color textSecondary = Color(0xFFB3B3B3);
   static const Color textDisabled = Color(0xFF757575);
 
+  static const Color darkColor = Color(0xFF121212);
   static const Color heartColor = Color(0xFFE91E63);
   static const Color bloodPressureColor = Color(0xFF9C27B0);
   static const Color spo2Color = Color(0xFF2196F3);

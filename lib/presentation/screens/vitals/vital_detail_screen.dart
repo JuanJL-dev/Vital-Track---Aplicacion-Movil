@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/vital_sign_model.dart';
-import '../../../data/services/mock_iot_service.dart';
+import '../../widgets/animated_vital_icon.dart';
 import '../../providers/vitals_provider.dart';
 
 class VitalDetailScreen extends StatefulWidget {
@@ -33,11 +34,9 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         : _selectedPeriod == 'Mes'
         ? 30
         : 365;
+    final provider = context.read<VitalsProvider>();
     setState(() {
-      _historicalData = MockIotService().generateHistoricalData(
-        widget.vitalType,
-        days,
-      );
+      _historicalData = provider.getHistoricalData(widget.vitalType, days);
     });
   }
 
@@ -53,6 +52,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         return 'Sueño';
       case VitalType.exercise:
         return 'Ejercicio';
+      case VitalType.steps:
+        return 'Pasos';
     }
   }
 
@@ -68,6 +69,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         return Icons.bedtime;
       case VitalType.exercise:
         return Icons.directions_run;
+      case VitalType.steps:
+        return Icons.directions_walk;
     }
   }
 
@@ -83,6 +86,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         return AppTheme.sleepColor;
       case VitalType.exercise:
         return AppTheme.exerciseColor;
+      case VitalType.steps:
+        return Colors.green;
     }
   }
 
@@ -98,95 +103,114 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildCurrentValue(vital),
+                _buildCurrentValue(vitalsProvider, vital),
                 const SizedBox(height: 24),
                 _buildPeriodSelector(),
                 const SizedBox(height: 16),
                 _buildChart(),
                 const SizedBox(height: 24),
                 _buildReferenceRanges(),
-                const SizedBox(height: 24),
-                _buildMeasureButton(vitalsProvider),
+                const SizedBox(height: 100),
               ],
             ),
           );
+        },
+      ),
+      bottomNavigationBar: Consumer<VitalsProvider>(
+        builder: (context, vitalsProvider, child) {
+          return _buildMeasureButton(vitalsProvider);
         },
       ),
     );
   }
 
   VitalSign? _getCurrentVital(VitalsProvider provider) {
-    switch (widget.vitalType) {
-      case VitalType.heartRate:
-        return provider.heartRate;
-      case VitalType.bloodPressure:
-        return provider.bloodPressure;
-      case VitalType.spo2:
-        return provider.spo2;
-      case VitalType.sleep:
-        return provider.sleep;
-      case VitalType.exercise:
-        return provider.exercise;
-    }
+    return provider.getCurrentVital(widget.vitalType);
   }
 
-  Widget _buildCurrentValue(VitalSign? vital) {
+  Widget _buildCurrentValue(VitalsProvider provider, VitalSign? vital) {
+    final isMeasuring = provider.isMeasuring;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(_icon, size: 48, color: _color),
-            const SizedBox(height: 16),
-            Text(
-              vital?.displayValue ?? '--',
-              style: Theme.of(context).textTheme.displayMedium?.copyWith(
-                color: _color,
-                fontWeight: FontWeight.bold,
+        child: Semantics(
+          label:
+              'Valor actual de ${_title}: ${vital?.displayValue ?? "sin datos"}',
+          child: Column(
+            children: [
+              PulsingGlow(
+                glowColor: _color,
+                isActive: isMeasuring,
+                child: AnimatedVitalIcon(
+                  vitalType: widget.vitalType,
+                  isAnimating: isMeasuring,
+                  size: 64,
+                ),
               ),
-            ),
-            Text(
-              vital?.unit ?? '',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: _color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(20),
+              const SizedBox(height: 16),
+              Text(
+                vital?.displayValue ?? '--',
+                style: Theme.of(context).textTheme.displayMedium?.copyWith(
+                  color: _color,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              child: Text(
-                vital?.getStatus() ?? 'Sin datos',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(color: _color),
+              Text(
+                vital?.unit ?? '',
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: _color.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  isMeasuring
+                      ? 'Midiendo...'
+                      : (vital?.getStatus() ?? 'Sin datos'),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: _color),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildPeriodSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: _periods.map((period) {
-        final isSelected = period == _selectedPeriod;
-        return ChoiceChip(
-          label: Text(period),
-          selected: isSelected,
-          onSelected: (selected) {
-            if (selected) {
-              setState(() {
-                _selectedPeriod = period;
-              });
-              _loadData();
-            }
-          },
-        );
-      }).toList(),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: _periods.map((period) {
+          final isSelected = period == _selectedPeriod;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Text(period),
+              selected: isSelected,
+              selectedColor: _color,
+              onSelected: (selected) {
+                if (selected) {
+                  setState(() {
+                    _selectedPeriod = period;
+                  });
+                  _loadData();
+                }
+              },
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -203,21 +227,101 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: SizedBox(height: 200, child: _buildSimpleChart()),
+        child: Semantics(
+          label: 'Gráfica histórica de ${_title}',
+          child: SizedBox(height: 250, child: LineChart(_createChartData())),
+        ),
       ),
     );
   }
 
-  Widget _buildSimpleChart() {
-    final spots = _historicalData
-        .asMap()
-        .entries
-        .map((e) => e.value.value)
-        .toList();
+  LineChartData _createChartData() {
+    final spots = _historicalData.asMap().entries.map((entry) {
+      return FlSpot(entry.key.toDouble(), entry.value.value);
+    }).toList();
 
-    return CustomPaint(
-      painter: _ChartPainter(spots: spots, color: _color),
-      size: const Size(double.infinity, 200),
+    final minY = _historicalData
+        .map((e) => e.value)
+        .reduce((a, b) => a < b ? a : b);
+    final maxY = _historicalData
+        .map((e) => e.value)
+        .reduce((a, b) => a > b ? a : b);
+    final padding = (maxY - minY) * 0.1;
+
+    return LineChartData(
+      gridData: FlGridData(
+        show: true,
+        drawVerticalLine: false,
+        getDrawingHorizontalLine: (value) => FlLine(
+          color: AppTheme.textSecondary.withOpacity(0.2),
+          strokeWidth: 1,
+        ),
+      ),
+      titlesData: FlTitlesData(
+        show: true,
+        rightTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        bottomTitles: const AxisTitles(
+          sideTitles: SideTitles(showTitles: false),
+        ),
+        leftTitles: AxisTitles(
+          sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 40,
+            getTitlesWidget: (value, meta) {
+              return Text(
+                value.toStringAsFixed(0),
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 10),
+              );
+            },
+          ),
+        ),
+      ),
+      borderData: FlBorderData(show: false),
+      minX: 0,
+      maxX: (spots.length - 1).toDouble(),
+      minY: minY - padding,
+      maxY: maxY + padding,
+      lineBarsData: [
+        LineChartBarData(
+          spots: spots,
+          isCurved: true,
+          curveSmoothness: 0.3,
+          color: _color,
+          barWidth: 3,
+          isStrokeCapRound: true,
+          dotData: const FlDotData(show: false),
+          belowBarData: BarAreaData(
+            show: true,
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [_color.withOpacity(0.3), _color.withOpacity(0.0)],
+            ),
+          ),
+        ),
+      ],
+      lineTouchData: LineTouchData(
+        enabled: true,
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (_) => AppTheme.surfaceColor,
+          getTooltipItems: (touchedSpots) {
+            return touchedSpots.map((spot) {
+              final index = spot.x.toInt();
+              if (index >= 0 && index < _historicalData.length) {
+                final data = _historicalData[index];
+                return LineTooltipItem(
+                  data.displayValue,
+                  TextStyle(color: _color, fontWeight: FontWeight.bold),
+                );
+              }
+              return null;
+            }).toList();
+          },
+        ),
+      ),
     );
   }
 
@@ -237,15 +341,18 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
             ...ranges.map(
               (range) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(range['status']!),
-                    Text(
-                      range['range']!,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ],
+                child: Semantics(
+                  label: '${range['status']}: ${range['range']}',
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(range['status']!),
+                      Text(
+                        range['range']!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -287,82 +394,68 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
           {'status': 'Moderado', 'range': '30 - 60 min'},
           {'status': 'Activo', 'range': '> 60 min'},
         ];
+      case VitalType.steps:
+        return [
+          {'status': 'Bajo', 'range': '< 5,000 pasos'},
+          {'status': 'Normal', 'range': '5,000 - 10,000 pasos'},
+          {'status': 'Activo', 'range': '> 10,000 pasos'},
+        ];
     }
   }
 
   Widget _buildMeasureButton(VitalsProvider provider) {
-    return ElevatedButton.icon(
-      onPressed: provider.isMeasuring
-          ? null
-          : () async {
-              await provider.startMeasurement(widget.vitalType);
-            },
-      icon: provider.isMeasuring
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.play_arrow),
-      label: Text(provider.isMeasuring ? 'Midiendo...' : 'Iniciar Medición'),
+    final isMeasuring = provider.isMeasuring;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.darkColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Semantics(
+          label: isMeasuring ? 'Midiendo signo vital' : 'Iniciar medición',
+          button: true,
+          enabled: !isMeasuring,
+          child: ElevatedButton.icon(
+            onPressed: isMeasuring
+                ? null
+                : () async {
+                    await provider.startMeasurement(widget.vitalType);
+                  },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _color,
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: isMeasuring
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.play_arrow, color: Colors.white),
+            label: Text(
+              isMeasuring ? 'Midiendo...' : 'Iniciar Medición',
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
-}
-
-class _ChartPainter extends CustomPainter {
-  final List<double> spots;
-  final Color color;
-
-  _ChartPainter({required this.spots, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (spots.isEmpty) return;
-
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    final fillPaint = Paint()
-      ..color = color.withOpacity(0.3)
-      ..style = PaintingStyle.fill;
-
-    final minVal = spots.reduce((a, b) => a < b ? a : b);
-    final maxVal = spots.reduce((a, b) => a > b ? a : b);
-    final range = maxVal - minVal;
-    final stepX = size.width / (spots.length - 1);
-
-    final path = Path();
-    final fillPath = Path();
-
-    for (int i = 0; i < spots.length; i++) {
-      final x = i * stepX;
-      final y = size.height - ((spots[i] - minVal) / range) * size.height;
-
-      if (i == 0) {
-        path.moveTo(x, y);
-        fillPath.moveTo(x, size.height);
-        fillPath.lineTo(x, y);
-      } else {
-        path.lineTo(x, y);
-        fillPath.lineTo(x, y);
-      }
-    }
-
-    fillPath.lineTo(size.width, size.height);
-    fillPath.close();
-
-    canvas.drawPath(fillPath, fillPaint);
-    canvas.drawPath(path, paint);
-
-    for (int i = 0; i < spots.length; i++) {
-      final x = i * stepX;
-      final y = size.height - ((spots[i] - minVal) / range) * size.height;
-      canvas.drawCircle(Offset(x, y), 4, Paint()..color = color);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

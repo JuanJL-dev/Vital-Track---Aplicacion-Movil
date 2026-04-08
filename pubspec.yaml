@@ -12,10 +12,21 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
+  
+  # Estado
   provider: ^6.1.5
+  
+  # UI y Gráficos
   fl_chart: ^0.69.0
-  shared_preferences: ^2.3.4
   google_fonts: ^6.2.1
+  
+  # Backend
+  supabase_flutter: ^2.6.0
+  
+  # Persistencia
+  shared_preferences: ^2.3.4
+  
+  # Utilidades
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

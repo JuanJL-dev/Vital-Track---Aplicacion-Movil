@@ -1,4 +1,4 @@
-enum VitalType { heartRate, bloodPressure, spo2, sleep, exercise }
+enum VitalType { heartRate, bloodPressure, spo2, sleep, exercise, steps }
 
 class VitalSign {
   final String id;
@@ -29,6 +29,8 @@ class VitalSign {
         return 'hrs';
       case VitalType.exercise:
         return 'min';
+      case VitalType.steps:
+        return 'pasos';
     }
   }
 
@@ -38,6 +40,7 @@ class VitalSign {
       case VitalType.spo2:
       case VitalType.sleep:
       case VitalType.exercise:
+      case VitalType.steps:
         return value.toStringAsFixed(0);
       case VitalType.bloodPressure:
         return '${value.toStringAsFixed(0)}/${secondaryValue?.toStringAsFixed(0) ?? ""}';
@@ -67,6 +70,10 @@ class VitalSign {
       case VitalType.exercise:
         if (value < 30) return 'Sedentario';
         if (value < 60) return 'Moderado';
+        return 'Activo';
+      case VitalType.steps:
+        if (value < 5000) return 'Bajo';
+        if (value < 10000) return 'Normal';
         return 'Activo';
     }
   }
