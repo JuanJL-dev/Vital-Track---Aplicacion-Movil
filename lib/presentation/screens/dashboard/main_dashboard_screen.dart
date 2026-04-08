@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../data/models/vital_sign_model.dart';
 import '../../providers/vitals_provider.dart';
 import '../../providers/device_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/vital_card.dart';
 import '../vitals/vital_detail_screen.dart';
 import '../iot/device_screen.dart';
@@ -25,7 +26,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<VitalsProvider>().loadInitialData();
+      // INYECTAR EL ID DEL PACIENTE PARA SUPABASE
+      final authProvider = context.read<AuthProvider>();
+      final vitalsProvider = context.read<VitalsProvider>();
+      
+      if (authProvider.currentUser != null) {
+        vitalsProvider.setPatientId(authProvider.currentUser!.id);
+      }
+      vitalsProvider.loadInitialData();
     });
   }
 
@@ -38,9 +46,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           IconButton(
             icon: const Icon(Icons.bluetooth),
             onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
+              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
             },
             tooltip: 'Conectar dispositivo',
           ),
@@ -55,10 +61,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           });
         },
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Educación'),
         ],
@@ -68,14 +71,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
 
   Widget _buildBody() {
     switch (_currentIndex) {
-      case 0:
-        return _buildDashboard();
-      case 1:
-        return const ProfileScreen();
-      case 2:
-        return const EducationScreen();
-      default:
-        return _buildDashboard();
+      case 0: return _buildDashboard();
+      case 1: return const ProfileScreen();
+      case 2: return const EducationScreen();
+      default: return _buildDashboard();
     }
   }
 
@@ -92,10 +91,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           children: [
             _buildDeviceStatus(),
             const SizedBox(height: 24),
-            Text(
-              'Signos Vitales',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('Signos Vitales', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             _buildVitalsGrid(),
             const SizedBox(height: 24),
@@ -117,9 +113,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
               children: [
                 Icon(
                   isConnected ? Icons.watch : Icons.watch_off,
-                  color: isConnected
-                      ? AppTheme.successColor
-                      : AppTheme.textDisabled,
+                  color: isConnected ? AppTheme.successColor : AppTheme.textDisabled,
                   size: 32,
                 ),
                 const SizedBox(width: 16),
@@ -128,10 +122,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isConnected
-                            ? deviceProvider.connectedDevice?.name ??
-                                  'Dispositivo'
-                            : 'Sin dispositivo vinculado',
+                        isConnected ? deviceProvider.connectedDevice?.name ?? 'Dispositivo' : 'Sin dispositivo vinculado',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
@@ -144,9 +135,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                 if (isConnected)
                   Text(
                     '${deviceProvider.connectedDevice?.batteryLevel ?? 0}%',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.successColor,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.successColor),
                   ),
               ],
             ),
@@ -165,7 +154,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 1.1,
+          childAspectRatio: 0.75, // <-- ARREGLO DE UX: Tarjetas más altas
           children: [
             VitalCard(
               title: 'Frecuencia Cardíaca',
@@ -241,9 +230,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                 icon: Icons.bluetooth_searching,
                 label: 'Vincular',
                 onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DeviceScreen()),
-                  );
+                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
                 },
               ),
             ),
@@ -253,16 +240,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
     return ElevatedButton(
       onPressed: onTap,
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-      ),
+      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [Icon(icon), const SizedBox(width: 8), Text(label)],
@@ -271,8 +252,6 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   }
 
   void _navigateToVitalDetail(VitalType type) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => VitalDetailScreen(vitalType: type)),
-    );
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => VitalDetailScreen(vitalType: type)));
   }
 }

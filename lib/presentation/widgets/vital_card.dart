@@ -36,11 +36,7 @@ class VitalCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Icon(icon, color: color, size: 28),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: AppTheme.textDisabled,
-                    size: 16,
-                  ),
+                  Icon(Icons.arrow_forward_ios, color: AppTheme.textDisabled, size: 16),
                 ],
               ),
               const Spacer(),
@@ -60,17 +56,21 @@ class VitalCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
+              // <-- ARREGLO DE UX: FittedBox evita que el texto se corte
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: color.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
-                  status,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelSmall?.copyWith(color: color),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    status,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
+                  ),
                 ),
               ),
             ],

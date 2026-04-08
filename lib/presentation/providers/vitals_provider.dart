@@ -1,10 +1,12 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../data/models/vital_sign_model.dart';
 import '../../data/repositories/vitals_repository.dart';
+import '../../data/services/supabase_service.dart';
+import '../providers/auth_provider.dart';
 
 class VitalsProvider extends ChangeNotifier {
   VitalsRepository? _repository;
+  AuthProvider? _authProvider;
 
   VitalSign? _heartRate;
   VitalSign? _bloodPressure;
@@ -26,6 +28,22 @@ class VitalsProvider extends ChangeNotifier {
 
   VitalsProvider() {
     _repository = VitalsRepository();
+  }
+
+  void setAuthProvider(AuthProvider authProvider) {
+    _authProvider = authProvider;
+    _syncPatientId();
+  }
+
+  void _syncPatientId() {
+    if (_authProvider != null && _authProvider!.currentUser != null) {
+      final newPatientId = _authProvider!.currentUser!.id;
+      if (_patientId != newPatientId) {
+        _patientId = newPatientId;
+        debugPrint('PatientId synced from AuthProvider: $_patientId');
+        notifyListeners();
+      }
+    }
   }
 
   VitalSign? get heartRate => _heartRate;
@@ -50,7 +68,16 @@ class VitalsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? get patientId {
+    if (_patientId == null && _authProvider != null) {
+      _syncPatientId();
+    }
+    return _patientId;
+  }
+
   void loadInitialData() {
+    _syncPatientId();
+
     if (_repository == null) {
       _repository = VitalsRepository();
     }
@@ -89,6 +116,8 @@ class VitalsProvider extends ChangeNotifier {
 
     _initialized = true;
     notifyListeners();
+
+    _attemptSaveToDatabase();
   }
 
   Future<void> startMeasurement(VitalType type) async {
@@ -122,30 +151,79 @@ class VitalsProvider extends ChangeNotifier {
         break;
     }
 
-    if (_patientId != null && _heartRate != null) {
-      await _saveToDatabase();
-    }
-
     _isMeasuring = false;
     notifyListeners();
+
+    await _attemptSaveToDatabase();
   }
 
-  Future<void> _saveToDatabase() async {
-    if (_patientId == null || _repository == null) return;
+  Future<void> _attemptSaveToDatabase() async {
+    final pacienteId = _getPatientId();
+
+    if (pacienteId == null) {
+      debugPrint(
+        '🛑 ERROR CRÍTICO: No hay pacienteId. No se puede guardar en Supabase.',
+      );
+      debugPrint('   - _patientId local: $_patientId');
+      debugPrint('   - _authProvider: ${_authProvider != null}');
+      debugPrint('   - currentUser: ${_authProvider?.currentUser?.id}');
+      return;
+    }
+
+    if (!SupabaseService.isInitialized) {
+      debugPrint('🛑 ERROR: SupabaseService no está inicializado');
+      return;
+    }
+
+    debugPrint(
+      '✅ Intentando guardar en Supabase para el paciente: $pacienteId',
+    );
 
     try {
-      await _repository!.saveVitalSigns(
-        pacienteId: _patientId!,
-        heartRate: _heartRate!,
-        bloodPressure: _bloodPressure!,
-        spo2: _spo2!,
-        sleep: _sleep!,
-        exercise: _exercise!,
-        steps: _steps!,
+      final heartRateValue = _heartRate?.value ?? 0;
+      final bloodPressureValue = _bloodPressure?.value ?? 0;
+      final bloodPressureSecondary = _bloodPressure?.secondaryValue ?? 0;
+      final spo2Value = _spo2?.value ?? 0;
+      final sleepValue = _sleep?.value ?? 0;
+      final exerciseValue = _exercise?.value ?? 0;
+      final stepsValue = _steps?.value ?? 0;
+
+      debugPrint('📊 Datos a guardar:');
+      debugPrint('   - bpm: $heartRateValue');
+      debugPrint('   - spo2: $spo2Value');
+      debugPrint('   - pasos: ${stepsValue.toInt()}');
+      debugPrint('   - presion_sistolica: $bloodPressureValue');
+      debugPrint('   - presion_diastolica: $bloodPressureSecondary');
+      debugPrint('   - sueno: $sleepValue');
+      debugPrint('   - ejercicio_minutos: ${exerciseValue.toInt()}');
+
+      await SupabaseService().insertVitalSigns(
+        pacienteId: pacienteId,
+        bpm: heartRateValue,
+        spo2: spo2Value,
+        pasos: stepsValue.toInt(),
+        presionSistolica: bloodPressureValue,
+        presionDiastolica: bloodPressureSecondary,
+        sueno: sleepValue,
+        ejercicioMinutos: exerciseValue.toInt(),
       );
+
+      debugPrint('✅ Guardado exitoso en Supabase');
     } catch (e) {
-      debugPrint('Error saving vital signs: $e');
+      debugPrint('🛑 ERROR GUARDANDO EN SUPABASE: $e');
     }
+  }
+
+  String? _getPatientId() {
+    if (_patientId != null) return _patientId;
+
+    if (_authProvider != null && _authProvider!.currentUser != null) {
+      _patientId = _authProvider!.currentUser!.id;
+      debugPrint('✅ Obtenido pacienteId desde AuthProvider: $_patientId');
+      return _patientId;
+    }
+
+    return null;
   }
 
   void refreshData() {
