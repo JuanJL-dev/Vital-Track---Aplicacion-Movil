@@ -52,18 +52,4 @@ Advanced analytics dashboard for medical professionals (Web Client).
 Push notifications for abnormal vital sign alerts.
 
 
-### 2. Estrategia de Commits (Subir los cambios)
-Para que tu historial de GitHub se vea limpio y organizado, vamos a subir todo lo que arreglamos hoy usando el estándar de la industria. 
-
-Abre tu terminal en VS Code y ejecuta estos comandos uno por uno:
-
-git add .
-
-
-git commit -m "refactor(vitals): implement strict data typing for Supabase synchronization" -m "Fixed silent crash by ensuring data types (int/double) match the PostgreSQL schema. Refactored VitalsProvider to enforce integer parsing before payload dispatch."
-
-
-git commit -m "fix(ui): resolve RenderFlex overflow on vital cards" -m "Adjusted GridView childAspectRatio to 0.75 and implemented FittedBox to ensure dynamic text scaling on smaller physical devices."
-
-
 git push
