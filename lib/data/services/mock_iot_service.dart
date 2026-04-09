@@ -34,29 +34,21 @@ class MockIotService implements IIotService {
     );
   }
 
+  // NUEVO: Generador de Temperatura
   @override
-  VitalSign generateBloodPressure() {
-    final systolic = _rw.generate(
-      key: 'systolic',
-      min: 110.0,
-      max: 130.0,
-      volatility: 2.0,
-      stepSize: 4.0,
-    );
-
-    final diastolic = _rw.generate(
-      key: 'diastolic',
-      min: 70.0,
-      max: 85.0,
-      volatility: 1.5,
-      stepSize: 3.0,
+  VitalSign generateTemperature() {
+    final value = _rw.generate(
+      key: 'temperature',
+      min: 36.0,
+      max: 38.5,
+      volatility: 0.1,
+      stepSize: 0.2,
     );
 
     return VitalSign(
-      id: 'bp_${DateTime.now().millisecondsSinceEpoch}',
-      type: VitalType.bloodPressure,
-      value: systolic,
-      secondaryValue: diastolic,
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      type: VitalType.temperature,
+      value: value,
       timestamp: DateTime.now(),
       isSimulated: true,
     );
@@ -75,25 +67,6 @@ class MockIotService implements IIotService {
     return VitalSign(
       id: 'spo2_${DateTime.now().millisecondsSinceEpoch}',
       type: VitalType.spo2,
-      value: value,
-      timestamp: DateTime.now(),
-      isSimulated: true,
-    );
-  }
-
-  @override
-  VitalSign generateSleepData() {
-    final value = _rw.generate(
-      key: 'sleep',
-      min: 6.0,
-      max: 8.5,
-      volatility: 0.2,
-      stepSize: 0.3,
-    );
-
-    return VitalSign(
-      id: 'sleep_${DateTime.now().millisecondsSinceEpoch}',
-      type: VitalType.sleep,
       value: value,
       timestamp: DateTime.now(),
       isSimulated: true,
@@ -142,7 +115,7 @@ class MockIotService implements IIotService {
   List<VitalSign> generateHistoricalData(VitalType type, int days) {
     final List<VitalSign> data = [];
     final now = DateTime.now();
-    final hoursPerDay = type == VitalType.sleep ? 1 : 6;
+    final hoursPerDay = 6; // Quitamos la excepción del sueño
 
     for (int day = days - 1; day >= 0; day--) {
       final date = now.subtract(Duration(days: day));
@@ -187,28 +160,19 @@ class MockIotService implements IIotService {
           isSimulated: true,
         );
 
-      case VitalType.bloodPressure:
-        _rw.setInitialValue('sys_$keySuffix', 115.0);
-        _rw.setInitialValue('dia_$keySuffix', 75.0);
-        final systolic = _rw.generate(
-          key: 'sys_$keySuffix',
-          min: 100.0,
-          max: 150.0,
-          volatility: 3.0,
-          stepSize: 6.0,
-        );
-        final diastolic = _rw.generate(
-          key: 'dia_$keySuffix',
-          min: 60.0,
-          max: 100.0,
-          volatility: 2.0,
-          stepSize: 4.0,
+      case VitalType.temperature: // NUEVO HISTÓRICO
+        _rw.setInitialValue('temp_$keySuffix', 36.5);
+        final value = _rw.generate(
+          key: 'temp_$keySuffix',
+          min: 35.8,
+          max: 38.0,
+          volatility: 0.2,
+          stepSize: 0.1,
         );
         return VitalSign(
-          id: 'bp_hist_${timestamp.millisecondsSinceEpoch}',
+          id: 'temp_hist_${timestamp.millisecondsSinceEpoch}',
           type: type,
-          value: systolic,
-          secondaryValue: diastolic,
+          value: value,
           timestamp: timestamp,
           isSimulated: true,
         );
@@ -224,23 +188,6 @@ class MockIotService implements IIotService {
         );
         return VitalSign(
           id: 'spo2_hist_${timestamp.millisecondsSinceEpoch}',
-          type: type,
-          value: value,
-          timestamp: timestamp,
-          isSimulated: true,
-        );
-
-      case VitalType.sleep:
-        _rw.setInitialValue('sleep_$keySuffix', 7.0);
-        final value = _rw.generate(
-          key: 'sleep_$keySuffix',
-          min: 4.0,
-          max: 10.0,
-          volatility: 0.3,
-          stepSize: 0.5,
-        );
-        return VitalSign(
-          id: 'sleep_hist_${timestamp.millisecondsSinceEpoch}',
           type: type,
           value: value,
           timestamp: timestamp,
@@ -289,15 +236,11 @@ class MockIotService implements IIotService {
       case VitalType.heartRate:
         _rw.reset('heartRate');
         break;
-      case VitalType.bloodPressure:
-        _rw.reset('systolic');
-        _rw.reset('diastolic');
+      case VitalType.temperature: // NUEVO
+        _rw.reset('temperature');
         break;
       case VitalType.spo2:
         _rw.reset('spo2');
-        break;
-      case VitalType.sleep:
-        _rw.reset('sleep');
         break;
       case VitalType.exercise:
         _rw.reset('exercise');

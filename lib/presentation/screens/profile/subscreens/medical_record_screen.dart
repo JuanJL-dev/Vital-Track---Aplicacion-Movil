@@ -41,35 +41,20 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos el usuario del AuthProvider para los rangos configurados
+    final user = context.watch<AuthProvider>().currentUser;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Expediente Médico')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _medicalRecord == null
           ? _buildEmptyState()
-          : _buildMedicalRecordContent(),
+          : _buildMedicalRecordContent(user), // Pasamos el usuario aquí
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.folder_off, size: 64, color: AppTheme.textDisabled),
-          const SizedBox(height: 16),
-          Text(
-            'No hay expediente médico disponible',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(color: AppTheme.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMedicalRecordContent() {
+  Widget _buildMedicalRecordContent(dynamic user) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -106,22 +91,46 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
               _medicalRecord?['correo'] ?? 'No registrado',
             ),
           ]),
+
           const SizedBox(height: 24),
-          _buildSectionHeader('Rangos de Referencia'),
-          _buildReadOnlyCard([
-            _buildReadOnlyField(
-              'Frecuencia Cardíaca',
-              '${_medicalRecord?['bpm_min'] ?? "-"} - ${_medicalRecord?['bpm_max'] ?? "-"} lpm',
-            ),
-            _buildReadOnlyField(
-              'SpO2 Mínimo',
-              '${_medicalRecord?['spo2_min'] ?? "-"}%',
-            ),
-            _buildReadOnlyField(
-              'Temperatura',
-              '${_medicalRecord?['temp_min'] ?? "-"}°C - ${_medicalRecord?['temp_max'] ?? "-"}°C',
-            ),
-          ]),
+
+          // NUEVA SECCIÓN DE RANGOS CONFIGURADOS
+          _buildSectionHeader('Rangos Configurados'),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            childAspectRatio: 1.4,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            children: [
+              _buildRangoItem(
+                'Frec. Cardíaca',
+                '${user?.bpmMin.toStringAsFixed(0)} - ${user?.bpmMax.toStringAsFixed(0)}',
+                'bpm',
+                Colors.red,
+              ),
+              _buildRangoItem(
+                'Oxigenación Mín.',
+                '> ${user?.spo2Min.toStringAsFixed(0)}%',
+                'SpO2',
+                Colors.blue,
+              ),
+              _buildRangoItem(
+                'Temperatura',
+                '${user?.tempMin.toStringAsFixed(1)}° - ${user?.tempMax.toStringAsFixed(1)}°',
+                '°C',
+                Colors.orange,
+              ),
+              _buildRangoItem(
+                'Estado Sistema',
+                'Activo',
+                'Monitoreo',
+                Colors.green,
+              ),
+            ],
+          ),
+
           const SizedBox(height: 24),
           _buildSectionHeader('Estado de la Cuenta'),
           _buildReadOnlyCard([
@@ -134,6 +143,7 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
               _formatDate(_medicalRecord?['created_at']),
             ),
           ]),
+
           const SizedBox(height: 24),
           _buildInfoBanner(),
         ],
@@ -141,6 +151,39 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
     );
   }
 
+  // Widget auxiliar para las tarjetas de rangos
+  Widget _buildRangoItem(String title, String value, String unit, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          Text(unit, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  // --- MÉTODOS DE APOYO EXISTENTES ---
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -154,25 +197,30 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
   }
 
   Widget _buildReadOnlyCard(List<Widget> children) {
-    return Card(child: Column(children: children));
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Column(children: children),
+    );
   }
 
   Widget _buildReadOnlyField(String label, String value) {
-    return Semantics(
-      label: '$label: $value',
-      child: ListTile(
-        title: Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
-        ),
-        subtitle: Text(value, style: Theme.of(context).textTheme.titleMedium),
-        trailing: const Icon(
-          Icons.lock_outline,
-          size: 16,
-          color: AppTheme.textSecondary,
-        ),
+    return ListTile(
+      title: Text(
+        label,
+        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+      ),
+      subtitle: Text(
+        value,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+      ),
+      trailing: const Icon(
+        Icons.lock_outline,
+        size: 16,
+        color: AppTheme.textDisabled,
       ),
     );
   }
@@ -183,7 +231,6 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
       decoration: BoxDecoration(
         color: AppTheme.primaryColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primaryColor.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -191,15 +238,17 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'El expediente médico es administrado por tu médico asignado. Para modificarlo, contacta a tu proveedor de salud.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondary),
+              'El expediente médico es administrado por tu médico. Para modificarlo, contacta a tu proveedor.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildEmptyState() {
+    return const Center(child: Text('No hay expediente médico disponible'));
   }
 
   String _formatDate(dynamic dateStr) {

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../data/models/user_model.dart';
 import '../../data/repositories/patient_repository.dart';
 import '../../data/services/supabase_service.dart';
+import '../../data/models/vital_sign_model.dart';
 
 class AuthProvider extends ChangeNotifier {
   final PatientRepository _patientRepository = PatientRepository();
@@ -174,5 +175,66 @@ class AuthProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  // --- MÉTODOS DE CONSULTA DE DATOS ---
+
+  Future<List<VitalSign>> getPatientHistory() async {
+    if (_currentUser == null) return [];
+
+    try {
+      final response = await SupabaseService().client
+          .from('signos_vitales')
+          .select()
+          .eq('paciente_id', _currentUser!.id)
+          .order('fecha_registro', ascending: false)
+          .limit(20);
+
+      List<VitalSign> allVitals = [];
+      final List data = response as List;
+
+      for (var row in data) {
+        try {
+          allVitals.addAll(VitalSign.fromSupabase(row));
+        } catch (e) {
+          // Registro silencioso del error para no saturar la consola,
+          // pero útil por si un dato llega corrupto.
+          debugPrint(
+            'Aviso: Se omitió un registro corrupto (ID: ${row['id']}). Error: $e',
+          );
+        }
+      }
+
+      return allVitals;
+    } catch (e) {
+      debugPrint('Error general consultando el historial: $e');
+      return [];
+    }
+  }
+
+  Future<void> refreshPacientConfig() async {
+    if (_currentUser == null) return;
+
+    try {
+      final response = await SupabaseService().client
+          .from('pacientes')
+          .select('bpm_min, bpm_max, spo2_min, temp_min, temp_max')
+          .eq('id', _currentUser!.id)
+          .single();
+
+      if (response != null) {
+        // Actualizamos solo los rangos del usuario actual
+        _currentUser = _currentUser!.copyWith(
+          bpmMin: (response['bpm_min'] as num?)?.toDouble() ?? 60.0,
+          bpmMax: (response['bpm_max'] as num?)?.toDouble() ?? 100.0,
+          spo2Min: (response['spo2_min'] as num?)?.toDouble() ?? 90.0,
+          tempMin: (response['temp_min'] as num?)?.toDouble() ?? 36.0,
+          tempMax: (response['temp_max'] as num?)?.toDouble() ?? 37.5,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error al refrescar configuración: $e');
+    }
   }
 }

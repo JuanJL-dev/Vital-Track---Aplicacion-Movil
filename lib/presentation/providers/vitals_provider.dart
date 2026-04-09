@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/models/vital_sign_model.dart';
 import '../../data/repositories/vitals_repository.dart';
 import '../../data/services/supabase_service.dart';
@@ -8,23 +9,24 @@ class VitalsProvider extends ChangeNotifier {
   VitalsRepository? _repository;
   AuthProvider? _authProvider;
 
+  // 1. Variables actualizadas (Adios presión y sueño, hola temperatura)
   VitalSign? _heartRate;
-  VitalSign? _bloodPressure;
   VitalSign? _spo2;
-  VitalSign? _sleep;
+  VitalSign? _temperature;
   VitalSign? _exercise;
   VitalSign? _steps;
 
   List<VitalSign> _heartRateHistory = [];
-  List<VitalSign> _bloodPressureHistory = [];
   List<VitalSign> _spo2History = [];
-  List<VitalSign> _sleepHistory = [];
+  List<VitalSign> _temperatureHistory = [];
   List<VitalSign> _exerciseHistory = [];
   List<VitalSign> _stepsHistory = [];
 
   bool _isMeasuring = false;
   String? _patientId;
   bool _initialized = false;
+
+  RealtimeChannel? _vitalsSubscription;
 
   VitalsProvider() {
     _repository = VitalsRepository();
@@ -40,23 +42,101 @@ class VitalsProvider extends ChangeNotifier {
       final newPatientId = _authProvider!.currentUser!.id;
       if (_patientId != newPatientId) {
         _patientId = newPatientId;
-        debugPrint('PatientId synced from AuthProvider: $_patientId');
+        _setupRealtimeSubscription();
         notifyListeners();
       }
     }
   }
 
+  void _setupRealtimeSubscription() {
+    if (_patientId == null) return;
+
+    _vitalsSubscription?.unsubscribe();
+
+    final supabase = Supabase.instance.client;
+
+    _vitalsSubscription = supabase
+        .channel('public:signos_vitales')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'signos_vitales',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'paciente_id',
+            value: _patientId!,
+          ),
+          callback: (PostgresChangePayload payload) {
+            final data = payload.newRecord;
+
+            DateTime safeTimestamp = DateTime.now();
+            if (data['fecha_registro'] != null) {
+              safeTimestamp =
+                  DateTime.tryParse(data['fecha_registro'].toString()) ??
+                  DateTime.now();
+            } else if (data['created_at'] != null) {
+              safeTimestamp =
+                  DateTime.tryParse(data['created_at'].toString()) ??
+                  DateTime.now();
+            }
+
+            String safeId =
+                data['id']?.toString() ??
+                DateTime.now().millisecondsSinceEpoch.toString();
+
+            if (data['bpm'] != null) {
+              _heartRate = VitalSign(
+                id: safeId,
+                type: VitalType.heartRate,
+                value: (data['bpm'] as num).toDouble(),
+                timestamp: safeTimestamp,
+              );
+            }
+
+            if (data['spo2'] != null) {
+              _spo2 = VitalSign(
+                id: safeId,
+                type: VitalType.spo2,
+                value: (data['spo2'] as num).toDouble(),
+                timestamp: safeTimestamp,
+              );
+            }
+
+            // 2. NUEVO: Leer la temperatura que manda el simulador
+            if (data['temperatura'] != null) {
+              _temperature = VitalSign(
+                id: safeId,
+                type: VitalType.temperature,
+                value: (data['temperatura'] as num).toDouble(),
+                timestamp: safeTimestamp,
+              );
+            }
+
+            if (data['pasos'] != null) {
+              _steps = VitalSign(
+                id: safeId,
+                type: VitalType.steps,
+                value: (data['pasos'] as num).toDouble(),
+                timestamp: safeTimestamp,
+              );
+            }
+
+            notifyListeners();
+          },
+        )
+        .subscribe();
+  }
+
+  // 3. Getters actualizados
   VitalSign? get heartRate => _heartRate;
-  VitalSign? get bloodPressure => _bloodPressure;
   VitalSign? get spo2 => _spo2;
-  VitalSign? get sleep => _sleep;
+  VitalSign? get temperature => _temperature;
   VitalSign? get exercise => _exercise;
   VitalSign? get steps => _steps;
 
   List<VitalSign> get heartRateHistory => _heartRateHistory;
-  List<VitalSign> get bloodPressureHistory => _bloodPressureHistory;
   List<VitalSign> get spo2History => _spo2History;
-  List<VitalSign> get sleepHistory => _sleepHistory;
+  List<VitalSign> get temperatureHistory => _temperatureHistory;
   List<VitalSign> get exerciseHistory => _exerciseHistory;
   List<VitalSign> get stepsHistory => _stepsHistory;
 
@@ -64,8 +144,11 @@ class VitalsProvider extends ChangeNotifier {
   bool get isInitialized => _initialized;
 
   void setPatientId(String patientId) {
-    _patientId = patientId;
-    notifyListeners();
+    if (_patientId != patientId) {
+      _patientId = patientId;
+      _setupRealtimeSubscription();
+      notifyListeners();
+    }
   }
 
   String? get patientId {
@@ -77,147 +160,20 @@ class VitalsProvider extends ChangeNotifier {
 
   void loadInitialData() {
     _syncPatientId();
-
     if (_repository == null) {
       _repository = VitalsRepository();
     }
-
-    _repository!.resetMockState(VitalType.heartRate);
-    _repository!.resetMockState(VitalType.bloodPressure);
-    _repository!.resetMockState(VitalType.spo2);
-    _repository!.resetMockState(VitalType.sleep);
-    _repository!.resetMockState(VitalType.exercise);
-    _repository!.resetMockState(VitalType.steps);
-
-    _heartRate = _repository!.generateMockVitalSign(VitalType.heartRate);
-    _bloodPressure = _repository!.generateMockVitalSign(
-      VitalType.bloodPressure,
-    );
-    _spo2 = _repository!.generateMockVitalSign(VitalType.spo2);
-    _sleep = _repository!.generateMockVitalSign(VitalType.sleep);
-    _exercise = _repository!.generateMockVitalSign(VitalType.exercise);
-    _steps = _repository!.generateMockVitalSign(VitalType.steps);
-
-    _heartRateHistory = _repository!.generateMockHistoricalData(
-      VitalType.heartRate,
-      7,
-    );
-    _bloodPressureHistory = _repository!.generateMockHistoricalData(
-      VitalType.bloodPressure,
-      7,
-    );
-    _spo2History = _repository!.generateMockHistoricalData(VitalType.spo2, 7);
-    _sleepHistory = _repository!.generateMockHistoricalData(VitalType.sleep, 7);
-    _exerciseHistory = _repository!.generateMockHistoricalData(
-      VitalType.exercise,
-      7,
-    );
-    _stepsHistory = _repository!.generateMockHistoricalData(VitalType.steps, 7);
-
     _initialized = true;
     notifyListeners();
-
-    _attemptSaveToDatabase();
+    _setupRealtimeSubscription();
   }
 
   Future<void> startMeasurement(VitalType type) async {
-    if (_repository == null) return;
-
     _isMeasuring = true;
     notifyListeners();
-
     await Future.delayed(const Duration(seconds: 3));
-
-    switch (type) {
-      case VitalType.heartRate:
-        _heartRate = _repository!.generateMockVitalSign(VitalType.heartRate);
-        break;
-      case VitalType.bloodPressure:
-        _bloodPressure = _repository!.generateMockVitalSign(
-          VitalType.bloodPressure,
-        );
-        break;
-      case VitalType.spo2:
-        _spo2 = _repository!.generateMockVitalSign(VitalType.spo2);
-        break;
-      case VitalType.sleep:
-        _sleep = _repository!.generateMockVitalSign(VitalType.sleep);
-        break;
-      case VitalType.exercise:
-        _exercise = _repository!.generateMockVitalSign(VitalType.exercise);
-        break;
-      case VitalType.steps:
-        _steps = _repository!.generateMockVitalSign(VitalType.steps);
-        break;
-    }
-
     _isMeasuring = false;
     notifyListeners();
-
-    await _attemptSaveToDatabase();
-  }
-
-Future<void> _attemptSaveToDatabase() async {
-    final pacienteId = _getPatientId();
-
-    if (pacienteId == null) {
-      debugPrint('🛑 ERROR CRÍTICO: No hay pacienteId. No se puede guardar en Supabase.');
-      return;
-    }
-
-    if (!SupabaseService.isInitialized) {
-      debugPrint('🛑 ERROR: SupabaseService no está inicializado');
-      return;
-    }
-
-    debugPrint('✅ Intentando guardar en Supabase para el paciente: $pacienteId');
-
-    try {
-      // AQUÍ ESTÁ LA MAGIA: Convertimos a .toInt() los que en la BD son 'integer'
-      final heartRateValue = _heartRate?.value.toInt() ?? 0;
-      final bloodPressureValue = _bloodPressure?.value.toInt() ?? 0;
-      final bloodPressureSecondary = _bloodPressure?.secondaryValue?.toInt() ?? 0;
-      final spo2Value = _spo2?.value.toInt() ?? 0;
-      final sleepValue = _sleep?.value ?? 0.0; // Este se queda double porque en BD es numeric(4,2)
-      final exerciseValue = _exercise?.value.toInt() ?? 0;
-      final stepsValue = _steps?.value.toInt() ?? 0;
-
-      debugPrint('📊 Datos a guardar:');
-      debugPrint('   - bpm: $heartRateValue');
-      debugPrint('   - spo2: $spo2Value');
-      debugPrint('   - pasos: $stepsValue');
-      debugPrint('   - presion_sistolica: $bloodPressureValue');
-      debugPrint('   - presion_diastolica: $bloodPressureSecondary');
-      debugPrint('   - sueno: $sleepValue');
-      debugPrint('   - ejercicio_minutos: $exerciseValue');
-
-      await SupabaseService().insertVitalSigns(
-        pacienteId: pacienteId,
-        bpm: heartRateValue,
-        spo2: spo2Value,
-        pasos: stepsValue,
-        presionSistolica: bloodPressureValue,
-        presionDiastolica: bloodPressureSecondary,
-        sueno: sleepValue,
-        ejercicioMinutos: exerciseValue,
-      );
-
-      debugPrint('✅ Guardado exitoso en Supabase');
-    } catch (e) {
-      debugPrint('🛑 ERROR GUARDANDO EN SUPABASE: $e');
-    }
-  }
-
-  String? _getPatientId() {
-    if (_patientId != null) return _patientId;
-
-    if (_authProvider != null && _authProvider!.currentUser != null) {
-      _patientId = _authProvider!.currentUser!.id;
-      debugPrint('✅ Obtenido pacienteId desde AuthProvider: $_patientId');
-      return _patientId;
-    }
-
-    return null;
   }
 
   void refreshData() {
@@ -229,16 +185,15 @@ Future<void> _attemptSaveToDatabase() async {
     return _repository!.generateMockHistoricalData(type, days);
   }
 
+  // 4. Actualización de Switch Cases (Reemplazo de BP/Sleep por Temperature)
   VitalSign? getCurrentVital(VitalType type) {
     switch (type) {
       case VitalType.heartRate:
         return _heartRate;
-      case VitalType.bloodPressure:
-        return _bloodPressure;
       case VitalType.spo2:
         return _spo2;
-      case VitalType.sleep:
-        return _sleep;
+      case VitalType.temperature:
+        return _temperature;
       case VitalType.exercise:
         return _exercise;
       case VitalType.steps:
@@ -250,12 +205,10 @@ Future<void> _attemptSaveToDatabase() async {
     switch (type) {
       case VitalType.heartRate:
         return _heartRateHistory;
-      case VitalType.bloodPressure:
-        return _bloodPressureHistory;
       case VitalType.spo2:
         return _spo2History;
-      case VitalType.sleep:
-        return _sleepHistory;
+      case VitalType.temperature:
+        return _temperatureHistory;
       case VitalType.exercise:
         return _exerciseHistory;
       case VitalType.steps:
@@ -265,6 +218,7 @@ Future<void> _attemptSaveToDatabase() async {
 
   @override
   void dispose() {
+    _vitalsSubscription?.unsubscribe();
     super.dispose();
   }
 }

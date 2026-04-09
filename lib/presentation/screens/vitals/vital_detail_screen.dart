@@ -40,16 +40,15 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     });
   }
 
+  // 1. ACTUALIZAMOS LOS TÍTULOS
   String get _title {
     switch (widget.vitalType) {
       case VitalType.heartRate:
         return 'Frecuencia Cardíaca';
-      case VitalType.bloodPressure:
-        return 'Presión Arterial';
       case VitalType.spo2:
         return 'SpO2';
-      case VitalType.sleep:
-        return 'Sueño';
+      case VitalType.temperature:
+        return 'Temperatura'; // NUEVO
       case VitalType.exercise:
         return 'Ejercicio';
       case VitalType.steps:
@@ -57,16 +56,15 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     }
   }
 
+  // 2. ACTUALIZAMOS LOS ÍCONOS
   IconData get _icon {
     switch (widget.vitalType) {
       case VitalType.heartRate:
         return Icons.favorite;
-      case VitalType.bloodPressure:
-        return Icons.speed;
       case VitalType.spo2:
         return Icons.air;
-      case VitalType.sleep:
-        return Icons.bedtime;
+      case VitalType.temperature:
+        return Icons.thermostat; // NUEVO
       case VitalType.exercise:
         return Icons.directions_run;
       case VitalType.steps:
@@ -74,16 +72,15 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     }
   }
 
+  // 3. ACTUALIZAMOS LOS COLORES
   Color get _color {
     switch (widget.vitalType) {
       case VitalType.heartRate:
         return AppTheme.heartColor;
-      case VitalType.bloodPressure:
-        return AppTheme.bloodPressureColor;
       case VitalType.spo2:
         return AppTheme.spo2Color;
-      case VitalType.sleep:
-        return AppTheme.sleepColor;
+      case VitalType.temperature:
+        return Colors.orange; // NUEVO
       case VitalType.exercise:
         return AppTheme.exerciseColor;
       case VitalType.steps:
@@ -136,7 +133,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         padding: const EdgeInsets.all(24),
         child: Semantics(
           label:
-              'Valor actual de ${_title}: ${vital?.displayValue ?? "sin datos"}',
+              'Valor actual de $_title: ${vital?.displayValue ?? "sin datos"}',
           child: Column(
             children: [
               PulsingGlow(
@@ -173,7 +170,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                 child: Text(
                   isMeasuring
                       ? 'Midiendo...'
-                      : (vital?.getStatus() ?? 'Sin datos'),
+                      // 4. CORREGIMOS getStatus() POR status
+                      : (vital?.status ?? 'Sin datos'),
                   style: Theme.of(
                     context,
                   ).textTheme.titleMedium?.copyWith(color: _color),
@@ -228,7 +226,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Semantics(
-          label: 'Gráfica histórica de ${_title}',
+          label: 'Gráfica histórica de $_title',
           child: SizedBox(height: 250, child: LineChart(_createChartData())),
         ),
       ),
@@ -362,6 +360,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     );
   }
 
+  // 5. ACTUALIZAMOS LOS RANGOS DE REFERENCIA
   List<Map<String, String>> _getReferenceRanges() {
     switch (widget.vitalType) {
       case VitalType.heartRate:
@@ -370,23 +369,16 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
           {'status': 'Normal', 'range': '60 - 100 lpm'},
           {'status': 'Elevado', 'range': '> 100 lpm'},
         ];
-      case VitalType.bloodPressure:
-        return [
-          {'status': 'Normal', 'range': '< 120/80 mmHg'},
-          {'status': 'Prehipertensión', 'range': '120-139/80-89 mmHg'},
-          {'status': 'Hipertensión Etapa 1', 'range': '140-159/90-99 mmHg'},
-          {'status': 'Hipertensión Etapa 2', 'range': '≥ 160/100 mmHg'},
-        ];
       case VitalType.spo2:
         return [
           {'status': 'Hipoxia Leve', 'range': '90 - 94 %'},
           {'status': 'Normal', 'range': '95 - 100 %'},
         ];
-      case VitalType.sleep:
+      case VitalType.temperature: // NUEVO RANGO
         return [
-          {'status': 'Insuficiente', 'range': '< 6 horas'},
-          {'status': 'Suficiente', 'range': '6 - 7 horas'},
-          {'status': 'Óptimo', 'range': '7 - 9 horas'},
+          {'status': 'Hipotermia', 'range': '< 36.0 °C'},
+          {'status': 'Normal', 'range': '36.0 - 37.5 °C'},
+          {'status': 'Fiebre', 'range': '> 37.5 °C'},
         ];
       case VitalType.exercise:
         return [

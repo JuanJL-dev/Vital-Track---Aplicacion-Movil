@@ -11,6 +11,7 @@ import '../vitals/vital_detail_screen.dart';
 import '../iot/device_screen.dart';
 import '../profile/profile_screen.dart';
 import '../education/education_screen.dart';
+import '../history_screen.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   const MainDashboardScreen({super.key});
@@ -26,10 +27,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // INYECTAR EL ID DEL PACIENTE PARA SUPABASE
       final authProvider = context.read<AuthProvider>();
       final vitalsProvider = context.read<VitalsProvider>();
-      
+
       if (authProvider.currentUser != null) {
         vitalsProvider.setPatientId(authProvider.currentUser!.id);
       }
@@ -41,12 +41,26 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppConstants.appName),
+        title: const Text('VitalTrack'), // Cambiado según tu petición
         actions: [
+          // Nuevo botón de Historial
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryScreen()),
+              );
+            },
+            tooltip: 'Ver historial',
+          ),
+          // Mantenemos el botón de Bluetooth que ya tenías
           IconButton(
             icon: const Icon(Icons.bluetooth),
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
             },
             tooltip: 'Conectar dispositivo',
           ),
@@ -61,7 +75,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           });
         },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           BottomNavigationBarItem(icon: Icon(Icons.school), label: 'Educación'),
         ],
@@ -71,33 +88,32 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
 
   Widget _buildBody() {
     switch (_currentIndex) {
-      case 0: return _buildDashboard();
-      case 1: return const ProfileScreen();
-      case 2: return const EducationScreen();
-      default: return _buildDashboard();
+      case 0:
+        return _buildDashboard();
+      case 1:
+        return const ProfileScreen();
+      case 2:
+        return const EducationScreen();
+      default:
+        return _buildDashboard();
     }
   }
 
   Widget _buildDashboard() {
-    return RefreshIndicator(
-      onRefresh: () async {
-        context.read<VitalsProvider>().refreshData();
-      },
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDeviceStatus(),
-            const SizedBox(height: 24),
-            Text('Signos Vitales', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 16),
-            _buildVitalsGrid(),
-            const SizedBox(height: 24),
-            _buildQuickActions(),
-          ],
-        ),
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDeviceStatus(),
+          const SizedBox(height: 24),
+          Text('Signos Vitales', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          _buildVitalsGrid(),
+          const SizedBox(height: 24),
+          _buildQuickActions(),
+        ],
       ),
     );
   }
@@ -113,7 +129,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
               children: [
                 Icon(
                   isConnected ? Icons.watch : Icons.watch_off,
-                  color: isConnected ? AppTheme.successColor : AppTheme.textDisabled,
+                  color: isConnected
+                      ? AppTheme.successColor
+                      : AppTheme.textDisabled,
                   size: 32,
                 ),
                 const SizedBox(width: 16),
@@ -122,7 +140,10 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isConnected ? deviceProvider.connectedDevice?.name ?? 'Dispositivo' : 'Sin dispositivo vinculado',
+                        isConnected
+                            ? deviceProvider.connectedDevice?.name ??
+                                  'Dispositivo'
+                            : 'Sin dispositivo vinculado',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
@@ -135,7 +156,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                 if (isConnected)
                   Text(
                     '${deviceProvider.connectedDevice?.batteryLevel ?? 0}%',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.successColor),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.successColor,
+                    ),
                   ),
               ],
             ),
@@ -154,52 +177,43 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: 16,
           crossAxisSpacing: 16,
-          childAspectRatio: 0.75, // <-- ARREGLO DE UX: Tarjetas más altas
+          childAspectRatio: 0.75,
           children: [
             VitalCard(
-              title: 'Frecuencia Cardíaca',
-              value: vitalsProvider.heartRate?.value.toStringAsFixed(0) ?? '--',
+              title: 'Frec. Cardíaca',
+              value: vitalsProvider.heartRate?.displayValue ?? '--',
               unit: 'lpm',
-              status: vitalsProvider.heartRate?.getStatus() ?? '',
+              status: vitalsProvider.heartRate?.status ?? 'Sin datos',
               icon: Icons.favorite,
               color: AppTheme.heartColor,
               onTap: () => _navigateToVitalDetail(VitalType.heartRate),
             ),
             VitalCard(
-              title: 'Presión Arterial',
-              value: vitalsProvider.bloodPressure?.displayValue ?? '--/--',
-              unit: 'mmHg',
-              status: vitalsProvider.bloodPressure?.getStatus() ?? '',
-              icon: Icons.speed,
-              color: AppTheme.bloodPressureColor,
-              onTap: () => _navigateToVitalDetail(VitalType.bloodPressure),
-            ),
-            VitalCard(
               title: 'SpO2',
-              value: vitalsProvider.spo2?.value.toStringAsFixed(0) ?? '--',
+              value: vitalsProvider.spo2?.displayValue ?? '--',
               unit: '%',
-              status: vitalsProvider.spo2?.getStatus() ?? '',
+              status: vitalsProvider.spo2?.status ?? 'Sin datos',
               icon: Icons.air,
               color: AppTheme.spo2Color,
               onTap: () => _navigateToVitalDetail(VitalType.spo2),
             ),
             VitalCard(
-              title: 'Sueño',
-              value: vitalsProvider.sleep?.value.toStringAsFixed(1) ?? '--',
-              unit: 'hrs',
-              status: vitalsProvider.sleep?.getStatus() ?? '',
-              icon: Icons.bedtime,
-              color: AppTheme.sleepColor,
-              onTap: () => _navigateToVitalDetail(VitalType.sleep),
+              title: 'Temperatura',
+              value: vitalsProvider.temperature?.displayValue ?? '--',
+              unit: '°C',
+              status: vitalsProvider.temperature?.status ?? 'Sin datos',
+              icon: Icons.thermostat,
+              color: Colors.orange,
+              onTap: () => _navigateToVitalDetail(VitalType.temperature),
             ),
             VitalCard(
-              title: 'Ejercicio',
-              value: vitalsProvider.exercise?.value.toStringAsFixed(0) ?? '--',
-              unit: 'min',
-              status: vitalsProvider.exercise?.getStatus() ?? '',
-              icon: Icons.directions_run,
-              color: AppTheme.exerciseColor,
-              onTap: () => _navigateToVitalDetail(VitalType.exercise),
+              title: 'Pasos',
+              value: vitalsProvider.steps?.displayValue ?? '--',
+              unit: 'pasos',
+              status: vitalsProvider.steps?.status ?? 'Sin datos',
+              icon: Icons.directions_walk,
+              color: Colors.green,
+              onTap: () => _navigateToVitalDetail(VitalType.steps),
             ),
           ],
         );
@@ -217,20 +231,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           children: [
             Expanded(
               child: _buildActionButton(
-                icon: Icons.refresh,
-                label: 'Actualizar',
-                onTap: () {
-                  context.read<VitalsProvider>().refreshData();
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: _buildActionButton(
                 icon: Icons.bluetooth_searching,
-                label: 'Vincular',
+                label: 'Vincular Dispositivo',
                 onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DeviceScreen()));
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const DeviceScreen()),
+                  );
                 },
               ),
             ),
@@ -240,10 +246,16 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
     );
   }
 
-  Widget _buildActionButton({required IconData icon, required String label, required VoidCallback onTap}) {
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return ElevatedButton(
       onPressed: onTap,
-      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [Icon(icon), const SizedBox(width: 8), Text(label)],
@@ -252,6 +264,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
   }
 
   void _navigateToVitalDetail(VitalType type) {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => VitalDetailScreen(vitalType: type)));
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => VitalDetailScreen(vitalType: type)),
+    );
   }
 }

@@ -74,16 +74,15 @@ class _AnimatedVitalIconState extends State<AnimatedVitalIcon>
     super.dispose();
   }
 
+  // 1. ACTUALIZAMOS LOS ICONOS
   IconData get _iconData {
     switch (widget.vitalType) {
       case VitalType.heartRate:
         return Icons.favorite;
-      case VitalType.bloodPressure:
-        return Icons.speed;
       case VitalType.spo2:
         return Icons.air;
-      case VitalType.sleep:
-        return Icons.bedtime;
+      case VitalType.temperature: // NUEVO
+        return Icons.thermostat;
       case VitalType.exercise:
         return Icons.directions_run;
       case VitalType.steps:
@@ -91,16 +90,15 @@ class _AnimatedVitalIconState extends State<AnimatedVitalIcon>
     }
   }
 
+  // 2. ACTUALIZAMOS LOS COLORES
   Color get _defaultColor {
     switch (widget.vitalType) {
       case VitalType.heartRate:
         return AppTheme.heartColor;
-      case VitalType.bloodPressure:
-        return AppTheme.bloodPressureColor;
       case VitalType.spo2:
         return AppTheme.spo2Color;
-      case VitalType.sleep:
-        return AppTheme.sleepColor;
+      case VitalType.temperature: // NUEVO
+        return Colors.orange;
       case VitalType.exercise:
         return AppTheme.exerciseColor;
       case VitalType.steps:

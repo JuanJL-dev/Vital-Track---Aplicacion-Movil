@@ -15,21 +15,18 @@ class VitalsRepository {
   Future<void> saveVitalSigns({
     required String pacienteId,
     required VitalSign heartRate,
-    required VitalSign bloodPressure,
+    required VitalSign temperature, // NUEVO: Reemplaza a presión y sueño
     required VitalSign spo2,
-    required VitalSign sleep,
     required VitalSign exercise,
     required VitalSign steps,
   }) async {
     try {
       await _supabaseService.insertVitalSigns(
         pacienteId: pacienteId,
-        bpm: heartRate.value.toInt(), // AHORA CONVERTIDO A INT
-        spo2: spo2.value.toInt(), // AHORA CONVERTIDO A INT
+        bpm: heartRate.value.toInt(),
+        spo2: spo2.value.toInt(),
         pasos: steps.value.toInt(),
-        presionSistolica: bloodPressure.value.toInt(), // AHORA CONVERTIDO A INT
-        presionDiastolica: (bloodPressure.secondaryValue ?? 0).toInt(), // AHORA CONVERTIDO A INT
-        sueno: sleep.value,
+        temperatura: temperature.value, // NUEVO: Guardando temperatura
         ejercicioMinutos: exercise.value.toInt(),
       );
     } catch (e) {
@@ -49,23 +46,33 @@ class VitalsRepository {
       );
 
       return response.map((item) {
+        // Aprovechamos para usar nuestra fecha segura anti-crasheos
+        DateTime safeTimestamp = DateTime.now();
+        if (item['fecha_registro'] != null) {
+          safeTimestamp =
+              DateTime.tryParse(item['fecha_registro'].toString()) ??
+              DateTime.now();
+        } else if (item['created_at'] != null) {
+          safeTimestamp =
+              DateTime.tryParse(item['created_at'].toString()) ??
+              DateTime.now();
+        }
+
         switch (type) {
           case VitalType.heartRate:
             return VitalSign(
               id: item['id'].toString(),
               type: VitalType.heartRate,
               value: (item['bpm'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
+              timestamp: safeTimestamp,
               isSimulated: false,
             );
-          case VitalType.bloodPressure:
+          case VitalType.temperature: // NUEVO
             return VitalSign(
               id: item['id'].toString(),
-              type: VitalType.bloodPressure,
-              value: (item['presion_sistolica'] as num?)?.toDouble() ?? 0,
-              secondaryValue:
-                  (item['presion_diastolica'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
+              type: VitalType.temperature,
+              value: (item['temperatura'] as num?)?.toDouble() ?? 0,
+              timestamp: safeTimestamp,
               isSimulated: false,
             );
           case VitalType.spo2:
@@ -73,15 +80,7 @@ class VitalsRepository {
               id: item['id'].toString(),
               type: VitalType.spo2,
               value: (item['spo2'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
-              isSimulated: false,
-            );
-          case VitalType.sleep:
-            return VitalSign(
-              id: item['id'].toString(),
-              type: VitalType.sleep,
-              value: (item['sueno'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
+              timestamp: safeTimestamp,
               isSimulated: false,
             );
           case VitalType.exercise:
@@ -89,7 +88,7 @@ class VitalsRepository {
               id: item['id'].toString(),
               type: VitalType.exercise,
               value: (item['ejercicio_minutos'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
+              timestamp: safeTimestamp,
               isSimulated: false,
             );
           case VitalType.steps:
@@ -97,7 +96,7 @@ class VitalsRepository {
               id: item['id'].toString(),
               type: VitalType.steps,
               value: (item['pasos'] as num?)?.toDouble() ?? 0,
-              timestamp: DateTime.parse(item['fecha_registro'].toString()),
+              timestamp: safeTimestamp,
               isSimulated: false,
             );
         }
@@ -111,12 +110,10 @@ class VitalsRepository {
     switch (type) {
       case VitalType.heartRate:
         return _mockService.generateHeartRate();
-      case VitalType.bloodPressure:
-        return _mockService.generateBloodPressure();
+      case VitalType.temperature: // NUEVO
+        return _mockService.generateTemperature();
       case VitalType.spo2:
         return _mockService.generateSpO2();
-      case VitalType.sleep:
-        return _mockService.generateSleepData();
       case VitalType.exercise:
         return _mockService.generateExerciseData();
       case VitalType.steps:
