@@ -27,6 +27,10 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
     final pacienteId = authProvider.currentUser?.id;
 
     if (pacienteId != null) {
+      // --- 1. SINCRONIZAMOS LOS LÍMITES MÉDICOS DE SUPABASE ---
+      await authProvider.syncRangosMedicos();
+
+      // --- 2. CARGAMOS EL RESTO DEL EXPEDIENTE ---
       final record = await _patientRepository.getMedicalRecord(pacienteId);
       setState(() {
         _medicalRecord = record?.toJson();
@@ -41,7 +45,7 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos el usuario del AuthProvider para los rangos configurados
+    // Obtenemos el usuario del AuthProvider (que ya está actualizado)
     final user = context.watch<AuthProvider>().currentUser;
 
     return Scaffold(
@@ -50,7 +54,7 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _medicalRecord == null
           ? _buildEmptyState()
-          : _buildMedicalRecordContent(user), // Pasamos el usuario aquí
+          : _buildMedicalRecordContent(user),
     );
   }
 
@@ -94,7 +98,7 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
 
           const SizedBox(height: 24),
 
-          // NUEVA SECCIÓN DE RANGOS CONFIGURADOS
+          // SECCIÓN DE RANGOS CONFIGURADOS
           _buildSectionHeader('Rangos Configurados'),
           GridView.count(
             shrinkWrap: true,
@@ -151,7 +155,6 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
     );
   }
 
-  // Widget auxiliar para las tarjetas de rangos
   Widget _buildRangoItem(String title, String value, String unit, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -183,7 +186,6 @@ class _MedicalRecordScreenState extends State<MedicalRecordScreen> {
     );
   }
 
-  // --- MÉTODOS DE APOYO EXISTENTES ---
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

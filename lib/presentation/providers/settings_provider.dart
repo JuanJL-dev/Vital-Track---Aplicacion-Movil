@@ -13,6 +13,10 @@ class SettingsProvider extends ChangeNotifier {
   bool get darkModeEnabled => _darkModeEnabled;
   bool get isLoading => _isLoading;
 
+  // --- AÑADE ESTA LÍNEA AQUÍ PARA QUITAR EL ERROR DEL MAIN ---
+  bool get isDarkMode => _darkModeEnabled;
+  // ----------------------------------------------------------
+
   SettingsProvider() {
     _loadSettings();
   }
@@ -47,6 +51,7 @@ class SettingsProvider extends ChangeNotifier {
     }
   }
 
+  // Cambiamos el nombre a toggleTheme o simplemente asegúrate de usar este
   Future<void> setDarkModeEnabled(bool enabled) async {
     _darkModeEnabled = enabled;
     notifyListeners();

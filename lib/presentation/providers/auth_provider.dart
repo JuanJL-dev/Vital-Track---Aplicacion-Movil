@@ -222,19 +222,44 @@ class AuthProvider extends ChangeNotifier {
           .eq('id', _currentUser!.id)
           .single();
 
-      if (response != null) {
-        // Actualizamos solo los rangos del usuario actual
-        _currentUser = _currentUser!.copyWith(
-          bpmMin: (response['bpm_min'] as num?)?.toDouble() ?? 60.0,
-          bpmMax: (response['bpm_max'] as num?)?.toDouble() ?? 100.0,
-          spo2Min: (response['spo2_min'] as num?)?.toDouble() ?? 90.0,
-          tempMin: (response['temp_min'] as num?)?.toDouble() ?? 36.0,
-          tempMax: (response['temp_max'] as num?)?.toDouble() ?? 37.5,
-        );
-        notifyListeners();
-      }
+      // Actualizamos solo los rangos del usuario actual
+      _currentUser = _currentUser!.copyWith(
+        bpmMin: (response['bpm_min'] as num?)?.toDouble() ?? 60.0,
+        bpmMax: (response['bpm_max'] as num?)?.toDouble() ?? 100.0,
+        spo2Min: (response['spo2_min'] as num?)?.toDouble() ?? 90.0,
+        tempMin: (response['temp_min'] as num?)?.toDouble() ?? 36.0,
+        tempMax: (response['temp_max'] as num?)?.toDouble() ?? 37.5,
+      );
+      notifyListeners();
     } catch (e) {
       debugPrint('Error al refrescar configuración: $e');
+    }
+  }
+
+  Future<void> syncRangosMedicos() async {
+    if (_currentUser == null) return;
+
+    try {
+      // Buscamos los datos más frescos directamente en la base de datos
+      final response = await SupabaseService().client
+          .from('pacientes')
+          .select('bpm_min, bpm_max, spo2_min, temp_min, temp_max')
+          .eq('id', _currentUser!.id)
+          .single();
+
+      // Actualizamos al usuario en memoria con los nuevos límites
+      _currentUser = _currentUser!.copyWith(
+        bpmMin: (response['bpm_min'] as num?)?.toDouble() ?? 60.0,
+        bpmMax: (response['bpm_max'] as num?)?.toDouble() ?? 100.0,
+        spo2Min: (response['spo2_min'] as num?)?.toDouble() ?? 90.0,
+        tempMin: (response['temp_min'] as num?)?.toDouble() ?? 36.0,
+        tempMax: (response['temp_max'] as num?)?.toDouble() ?? 37.5,
+      );
+
+      // 🔥 IMPORTANTE: Esto le avisa al Expediente y a las Alertas que usen los nuevos valores
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error sincronizando rangos médicos: $e');
     }
   }
 }

@@ -17,7 +17,7 @@ dependencies:
   provider: ^6.1.5
   
   # UI y Gráficos
-  fl_chart: ^0.69.0
+  fl_chart: ^1.2.0
   google_fonts: ^6.2.1
   
   # Backend

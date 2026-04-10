@@ -254,6 +254,15 @@ class ProfileScreen extends StatelessWidget {
               );
             },
           ),
+          SwitchListTile(
+            title: const Text('Modo Oscuro'),
+            secondary: const Icon(Icons.brightness_6),
+            value: context.watch<SettingsProvider>().darkModeEnabled,
+            onChanged: (bool value) {
+              // Usamos el método que ya tenías en tu archivo
+              context.read<SettingsProvider>().setDarkModeEnabled(value);
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.security),
             title: const Text('Seguridad'),
